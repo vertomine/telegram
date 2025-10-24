@@ -1,0 +1,14 @@
+{
+  "name": "telegram-auth-server",
+  "version": "1.0.0",
+  "description": "Telegram Manager 在线授权验证",
+  "scripts": {
+    "dev": "vercel dev"
+  },
+  "dependencies": {
+    "jsonfile": "^6.1.0"
+  },
+  "devDependencies": {
+    "vercel": "^28.0.0"
+  }
+}
