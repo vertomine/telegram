@@ -1,7 +1,8 @@
 {
-  "name": "telegram-auth-server",
+  "name": "telegram-auth-server-fixed",
   "version": "1.0.0",
-  "description": "Telegram Manager 在线授权验证",
+  "type": "module",
+  "description": "Telegram Manager Online Auth API",
   "scripts": {
     "dev": "vercel dev"
   },

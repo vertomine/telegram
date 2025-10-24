@@ -1,12 +1,25 @@
-// api/auth.js - 更新版本
-const jsonfile = require('jsonfile');
-const fs = require('fs');
-const path = require('path');
+import jsonfile from 'jsonfile';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+import fs from 'fs';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 // 数据文件路径
-const authFile = path.join('/tmp', 'auth_data.json');
+const authFile = join('/tmp', 'auth_data.json');
 
-// 您的500个许可证密钥 - 请替换为实际的密钥
+// 初始化数据文件
+function initDataFiles() {
+  if (!fs.existsSync(authFile)) {
+    fs.writeFileSync(authFile, JSON.stringify({
+      devices: {},
+      used_keys: [],
+      created_at: new Date().toISOString()
+    }));
+  }
+}
+
 // 您的500个许可证密钥 - 请替换为实际的密钥
 const LICENSE_KEYS = [
     "DH5T5672POD6FBBV", "H7P8Q9WOED7H3M34", "3LJ4WYNVLTSXML45", "0SPS5CJS8PZF0KDY", "L1A3T7F1BA5YJX43", "TTNPA14FIYIPUAY0", "LODLZOX00KLNI0TQ", "5OIWLV6R364PYQPW",
@@ -74,18 +87,8 @@ const LICENSE_KEYS = [
     "1I5AACPJBNXUMXJ9", "3ZJOXAZOG5FZZHLE", "DFY6MJTBDDKBOS08", "JZSSP5Q5T4YX7FD2"
 ];
 
-// 初始化数据文件
-function initDataFiles() {
-  if (!fs.existsSync(authFile)) {
-    fs.writeFileSync(authFile, JSON.stringify({
-      devices: {},
-      used_keys: []
-    }));
-  }
-}
-
-module.exports = async (req, res) => {
-  // 设置允许跨域访问
+export default async function handler(req, res) {
+  // 设置CORS头
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -112,8 +115,8 @@ module.exports = async (req, res) => {
         return await handleActivate(req, res);
       case 'get_status':
         return await handleGetStatus(req, res);
-      case 'get_keys_info':
-        return await handleGetKeysInfo(req, res);
+      case 'health':
+        return res.status(200).json({ status: 'ok', service: 'auth-api' });
       default:
         return res.status(400).json({ success: false, message: '未知操作' });
     }
@@ -121,7 +124,7 @@ module.exports = async (req, res) => {
     console.error('服务器错误:', error);
     return res.status(500).json({ success: false, message: '服务器内部错误' });
   }
-};
+}
 
 // 检查授权状态
 async function handleCheckAuth(req, res) {
@@ -305,16 +308,5 @@ async function handleGetStatus(req, res) {
     days_remaining: Math.max(0, daysRemaining),
     first_activation: deviceAuth.first_activation,
     last_activation: deviceAuth.last_activation
-  });
-}
-
-// 获取密钥信息
-async function handleGetKeysInfo(req, res) {
-  const authData = jsonfile.readFileSync(authFile);
-  
-  return res.json({
-    total_keys: LICENSE_KEYS.length,
-    used_keys: authData.used_keys ? authData.used_keys.length : 0,
-    available_keys: LICENSE_KEYS.length - (authData.used_keys ? authData.used_keys.length : 0)
   });
 }

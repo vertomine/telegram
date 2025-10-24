@@ -1,11 +1,11 @@
-// api/health.js - 健康检查端点
-module.exports = (req, res) => {
-  res.setHeader('Content-Type', 'application/json');
+export default function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Content-Type', 'application/json');
   
   return res.status(200).json({
-    status: "healthy",
+    status: 'healthy',
+    service: 'Telegram Auth API',
     timestamp: new Date().toISOString(),
-    service: "auth-api"
+    version: '1.0.0'
   });
-};
+}
