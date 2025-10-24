@@ -6,21 +6,88 @@ import fs from 'fs';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-// 数据文件路径
-const authFile = join('/tmp', 'auth_data.json');
+console.log('auth.js 模块加载成功');
+
+// 数据文件路径 - 尝试多个可能的位置
+let authFile;
+try {
+  // 尝试使用 /tmp 目录
+  authFile = join('/tmp', 'auth_data.json');
+  console.log('使用 /tmp 目录:', authFile);
+} catch (error) {
+  // 备选方案
+  authFile = join(process.cwd(), 'auth_data.json');
+  console.log('使用工作目录:', authFile);
+}
+
+// 内存存储（备用方案）
+let memoryStore = null;
 
 // 初始化数据文件
 function initDataFiles() {
-  if (!fs.existsSync(authFile)) {
-    fs.writeFileSync(authFile, JSON.stringify({
+  try {
+    console.log('初始化数据文件，路径:', authFile);
+    console.log('当前工作目录:', process.cwd());
+    console.log('文件是否存在:', fs.existsSync(authFile));
+    
+    if (!fs.existsSync(authFile)) {
+      const initialData = {
+        devices: {},
+        used_keys: [],
+        created_at: new Date().toISOString()
+      };
+      fs.writeFileSync(authFile, JSON.stringify(initialData));
+      console.log('数据文件创建成功');
+    } else {
+      console.log('数据文件已存在');
+    }
+  } catch (error) {
+    console.error('文件系统初始化失败:', error);
+    console.log('回退到内存存储');
+    
+    // 初始化内存存储
+    memoryStore = {
       devices: {},
       used_keys: [],
       created_at: new Date().toISOString()
-    }));
+    };
   }
 }
 
-// 您的500个许可证密钥 - 请替换为实际的密钥
+// 读取数据
+function readAuthData() {
+  if (memoryStore) {
+    console.log('使用内存存储读取数据');
+    return memoryStore;
+  }
+  
+  try {
+    console.log('从文件读取数据:', authFile);
+    return jsonfile.readFileSync(authFile);
+  } catch (error) {
+    console.error('读取文件失败:', error);
+    throw error;
+  }
+}
+
+// 写入数据
+function writeAuthData(data) {
+  if (memoryStore) {
+    console.log('使用内存存储写入数据');
+    memoryStore = data;
+    return;
+  }
+  
+  try {
+    console.log('写入文件:', authFile);
+    jsonfile.writeFileSync(authFile, data, { spaces: 2 });
+  } catch (error) {
+    console.error('写入文件失败:', error);
+    throw error;
+  }
+}
+
+// 您的500个许可证密钥
 const LICENSE_KEYS = [
     "DH5T5672POD6FBBV", "H7P8Q9WOED7H3M34", "3LJ4WYNVLTSXML45", "0SPS5CJS8PZF0KDY", "L1A3T7F1BA5YJX43", "TTNPA14FIYIPUAY0", "LODLZOX00KLNI0TQ", "5OIWLV6R364PYQPW",
     "HFDYZ6UJCWKBR0DP", "2EH2EV0DVJLXGEO9", "RO7U33K3X495ULP8", "OT9MNMT292A0ZQTU", "S536QNWTURJ8FFC8", "IQXAVPYD4GXS1Q4B", "T4X8J796V6QXOE2Y", "MHPT9A80T0TRSE9P",
@@ -88,6 +155,8 @@ const LICENSE_KEYS = [
 ];
 
 export default async function handler(req, res) {
+  console.log('收到请求:', req.method, req.url);
+  
   // 设置CORS头
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -95,34 +164,62 @@ export default async function handler(req, res) {
   
   // 处理预检请求
   if (req.method === 'OPTIONS') {
+    console.log('处理OPTIONS预检请求');
     return res.status(200).end();
   }
   
-  // 初始化数据文件
-  initDataFiles();
-  
   try {
+    console.log('请求体:', JSON.stringify(req.body));
+    
+    // 初始化数据文件
+    console.log('开始初始化数据文件...');
+    initDataFiles();
+    console.log('数据文件初始化完成');
+    
     const { action, device_id, license_key } = req.body;
     
-    console.log('收到请求:', { action, device_id, license_key: license_key ? '***' + license_key.slice(-4) : '无' });
+    console.log('解析请求参数:', { 
+      action, 
+      device_id, 
+      license_key: license_key ? '***' + license_key.slice(-4) : '无' 
+    });
+    
+    if (!action) {
+      console.log('缺少action参数');
+      return res.status(400).json({ success: false, message: '缺少action参数' });
+    }
     
     switch (action) {
       case 'check_auth':
+        console.log('处理check_auth请求');
         return await handleCheckAuth(req, res);
       case 'verify_key':
+        console.log('处理verify_key请求');
         return await handleVerifyKey(req, res);
       case 'activate':
+        console.log('处理activate请求');
         return await handleActivate(req, res);
       case 'get_status':
+        console.log('处理get_status请求');
         return await handleGetStatus(req, res);
       case 'health':
+        console.log('处理health检查');
         return res.status(200).json({ status: 'ok', service: 'auth-api' });
       default:
+        console.log('未知action:', action);
         return res.status(400).json({ success: false, message: '未知操作' });
     }
   } catch (error) {
-    console.error('服务器错误:', error);
-    return res.status(500).json({ success: false, message: '服务器内部错误' });
+    console.error('服务器错误详情:');
+    console.error('错误信息:', error.message);
+    console.error('错误堆栈:', error.stack);
+    console.error('错误类型:', error.constructor.name);
+    
+    return res.status(500).json({ 
+      success: false, 
+      message: '服务器内部错误',
+      error: error.message // 临时返回详细错误用于调试
+    });
   }
 }
 
@@ -134,7 +231,7 @@ async function handleCheckAuth(req, res) {
     return res.json({ authorized: false, message: '缺少设备ID' });
   }
   
-  const authData = jsonfile.readFileSync(authFile);
+  const authData = readAuthData();
   const deviceAuth = authData.devices[device_id];
   
   if (!deviceAuth || !deviceAuth.authorized) {
@@ -176,7 +273,7 @@ async function handleVerifyKey(req, res) {
     return res.json({ valid: false, message: '许可证密钥必须是16位' });
   }
   
-  const authData = jsonfile.readFileSync(authFile);
+  const authData = readAuthData();
   
   const keyIndex = LICENSE_KEYS.indexOf(license_key);
   
@@ -204,7 +301,7 @@ async function handleActivate(req, res) {
   }
   
   // 先验证密钥
-  const authData = jsonfile.readFileSync(authFile);
+  const authData = readAuthData();
   
   const keyIndex = LICENSE_KEYS.indexOf(license_key);
   
@@ -259,7 +356,7 @@ async function handleActivate(req, res) {
   authData.devices[device_id] = deviceAuth;
   
   // 保存数据
-  jsonfile.writeFileSync(authFile, authData, { spaces: 2 });
+  writeAuthData(authData);
   
   return res.json({
     success: true,
@@ -283,7 +380,7 @@ async function handleGetStatus(req, res) {
     });
   }
   
-  const authData = jsonfile.readFileSync(authFile);
+  const authData = readAuthData();
   const deviceAuth = authData.devices[device_id];
   
   if (!deviceAuth) {
